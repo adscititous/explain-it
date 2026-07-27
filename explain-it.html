@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Explain It — Slate & Take</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#17140f;
+    --card:#efe6cf;
+    --ink:#241f19;
+    --amber:#d9932e;
+    --amber-dim:#a9721f;
+    --red:#b23a34;
+    --sprocket:#332e24;
+    --muted:#8a8168;
+    --muted-light:#b7ad8f;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--card);
+    font-family:'IBM Plex Sans',sans-serif;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:28px 16px;
+    position:relative;
+    overflow-x:hidden;
+  }
+
+  /* film sprocket borders */
+  .sprocket-row{
+    position:fixed;
+    left:0; right:0;
+    display:flex;
+    justify-content:space-around;
+    padding:0 6px;
+    z-index:0;
+    pointer-events:none;
+  }
+  .sprocket-row.top{top:14px;}
+  .sprocket-row.bottom{bottom:14px;}
+  .sprocket-row span{
+    width:9px;height:13px;
+    background:var(--sprocket);
+    border-radius:2px;
+    opacity:.9;
+  }
+
+  .stage{
+    width:100%;
+    max-width:480px;
+    z-index:1;
+  }
+
+  .eyebrow{
+    text-align:center;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:.24em;
+    color:var(--muted-light);
+    text-transform:uppercase;
+    margin-bottom:14px;
+  }
+
+  .slate{
+    background:var(--card);
+    color:var(--ink);
+    border-radius:6px;
+    padding:22px 24px 26px;
+    box-shadow:0 20px 50px rgba(0,0,0,.45), 0 2px 0 rgba(0,0,0,.15) inset;
+    position:relative;
+  }
+
+  .slate-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    letter-spacing:.08em;
+    color:var(--muted);
+    border-bottom:1px dashed #cabf9e;
+    padding-bottom:12px;
+    margin-bottom:18px;
+  }
+
+  .rec-indicator{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    opacity:0;
+    transition:opacity .2s ease;
+  }
+  .rec-indicator.live{opacity:1;}
+  .rec-dot{
+    width:8px;height:8px;border-radius:50%;
+    background:var(--red);
+    animation:pulse 1s infinite;
+  }
+  @keyframes pulse{
+    0%,100%{opacity:1;}
+    50%{opacity:.35;}
+  }
+
+  .topic-wrap{
+    min-height:118px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding:6px 4px 18px;
+  }
+  .topic{
+    font-family:'Fraunces',serif;
+    font-weight:500;
+    font-style:italic;
+    font-size:clamp(26px,6.4vw,36px);
+    line-height:1.18;
+    letter-spacing:-.01em;
+    transition:opacity .05s ease;
+  }
+  .topic.spinning{
+    color:var(--muted);
+    opacity:.75;
+  }
+
+  .stage-body{
+    min-height:250px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:18px;
+  }
+
+  /* idle state */
+  .idle-copy{
+    text-align:center;
+    color:var(--muted);
+    font-size:13.5px;
+    line-height:1.55;
+    max-width:340px;
+  }
+  .idle-copy b{color:var(--ink);}
+
+  .btn-row{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    justify-content:center;
+  }
+  button{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    padding:12px 20px;
+    border-radius:3px;
+    border:1.5px solid var(--ink);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+    transition:transform .12s ease, background .15s ease, color .15s ease;
+  }
+  button:hover{transform:translateY(-1px);}
+  button:active{transform:translateY(0px) scale(.98);}
+  button.primary{
+    background:var(--ink);
+    color:var(--card);
+    border-color:var(--ink);
+  }
+  button.action{
+    background:var(--red);
+    color:#f6eee1;
+    border-color:var(--red);
+  }
+  button:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+
+  label.record-toggle{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--muted);
+    letter-spacing:.04em;
+    cursor:pointer;
+  }
+  label.record-toggle input{accent-color:var(--red);}
+
+  /* recording state */
+  .cam-ring-wrap{
+    position:relative;
+    width:210px;height:210px;
+  }
+  .cam-video{
+    position:absolute;
+    top:8px;left:8px;
+    width:194px;height:194px;
+    border-radius:50%;
+    object-fit:cover;
+    background:#0f0d0a;
+    transform:scaleX(-1);
+  }
+  .cam-placeholder{
+    position:absolute;
+    top:8px;left:8px;
+    width:194px;height:194px;
+    border-radius:50%;
+    background:#e1d6b8;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:var(--muted);
+    font-size:11px;
+    text-align:center;
+    padding:20px;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  svg.ring{position:absolute;top:0;left:0;transform:rotate(-90deg);}
+  .ring-bg{fill:none;stroke:#d9cba3;stroke-width:6;}
+  .ring-fg{fill:none;stroke:var(--red);stroke-width:6;stroke-linecap:round;transition:stroke-dashoffset .2s linear;}
+
+  .countdown-num{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:34px;
+    font-weight:600;
+    letter-spacing:-.02em;
+  }
+  .countdown-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    letter-spacing:.2em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-top:-8px;
+  }
+
+  /* done state */
+  .stamp{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    font-size:30px;
+    color:var(--red);
+    border:3px solid var(--red);
+    padding:6px 22px;
+    border-radius:6px;
+    transform:rotate(-6deg);
+    letter-spacing:.04em;
+    text-transform:uppercase;
+  }
+  .done-note{
+    text-align:center;
+    color:var(--muted);
+    font-size:13px;
+    max-width:300px;
+  }
+  a.dl-link{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--ink);
+    text-decoration:underline;
+  }
+
+  .footer{
+    margin-top:20px;
+    display:flex;
+    justify-content:space-between;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--muted-light);
+    letter-spacing:.05em;
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    .rec-dot{animation:none;}
+    button{transition:none;}
+  }
+</style>
+</head>
+<body>
+
+<div class="sprocket-row top" id="sprocketTop"></div>
+<div class="sprocket-row bottom" id="sprocketBottom"></div>
+
+<div class="stage">
+  <div class="eyebrow">Explain It — no notes, no AI, one minute</div>
+
+  <div class="slate">
+    <div class="slate-head">
+      <span id="sceneTake">SCENE 001 · TAKE 1</span>
+      <span class="rec-indicator" id="recIndicator"><span class="rec-dot"></span> REC</span>
+    </div>
+
+    <div class="topic-wrap">
+      <div class="topic" id="topicText">Tap "New Topic" to roll one.</div>
+    </div>
+
+    <div class="stage-body" id="stageBody">
+      <!-- filled by JS depending on state -->
+    </div>
+  </div>
+
+  <div class="footer">
+    <span id="takesCount">Takes done: 0</span>
+    <span id="bagCount">Topics left in deck: —</span>
+  </div>
+</div>
+
+<script>
+const TOPICS = [
+"Fundamental attribution error","Confirmation bias","The IKEA effect","Anchoring bias","Sunk cost fallacy",
+"Dunning-Kruger effect","Halo effect","Availability heuristic","Survivorship bias","Parkinson's law",
+"Hanlon's razor","Occam's razor","The Pareto principle","The Peter principle","Goodhart's law",
+"The Streisand effect","Baader-Meinhof phenomenon","Zeigarnik effect","The Ben Franklin effect","Mere exposure effect",
+"Bystander effect","Groupthink","Social proof","Loss aversion","The endowment effect",
+"Hindsight bias","Self-serving bias","Negativity bias","Optimism bias","The planning fallacy",
+"Dunbar's number","Broken windows theory","Black swan theory","The Overton window","Gell-Mann amnesia",
+"Simpson's paradox","The law of triviality (bikeshedding)","The spotlight effect","False consensus effect","Illusory superiority",
+"The framing effect","Recency bias","Primacy bias","Actor-observer bias","The just-world hypothesis",
+"Cognitive dissonance","Choice-supportive bias","In-group bias","Outgroup homogeneity bias","The horn effect",
+"The Barnum effect","The placebo effect","The Pygmalion effect","The Hawthorne effect","The butterfly effect",
+"Chesterton's fence","The tragedy of the commons","The prisoner's dilemma","Nash equilibrium","The Red Queen effect",
+"The Lindy effect","The law of diminishing returns","The law of unintended consequences","Metcalfe's law","Conway's law",
+"Murphy's law","Impostor syndrome","Analysis paralysis","Decision fatigue","The paradox of choice",
+"Status quo bias","Normalcy bias","The ostrich effect","Present bias","Hyperbolic discounting",
+"The gambler's fallacy","The hot hand fallacy","Base rate neglect","Regression to the mean","Selection bias",
+"The backfire effect","The illusory truth effect","The bandwagon effect","Herd mentality","Social loafing",
+"Diffusion of responsibility","Correspondence bias","The self-fulfilling prophecy","The nocebo effect","The overjustification effect",
+"The crowding-out effect","Not-invented-here syndrome","Reactance theory","The observer-expectancy effect","The anchoring effect",
+"The priming effect","The contrast effect","The decoy effect","The compromise effect","The Dilbert principle",
+"Founder's syndrome","The Abilene paradox","Design by committee","Second-system effect","Feature creep",
+"Scope creep","The free-rider problem","The public goods game","The default effect","Nudge theory",
+"Choice architecture","The Dunning-Kruger curve (peak of Mount Stupid)","The Matthew effect","The Lindy compatibility of old ideas","The forer effect",
+"The curse of knowledge","The illusion of explanatory depth","The paradox of skill","Regression toward mediocrity","The winner's curse",
+"The principal-agent problem","Moral hazard","Adverse selection","The tyranny of small decisions","The efficient market hypothesis (as heuristic, not law)",
+"The Coase theorem","Comparative advantage","Opportunity cost","Diminishing marginal utility","The paradox of thrift"
+];
+
+let bag = [];
+let currentTopic = null;
+let scene = 0;
+let take = 1;
+let takesDone = 0;
+
+let state = "idle"; // idle | recording | done
+let stream = null;
+let recorder = null;
+let recordedChunks = [];
+let timerId = null;
+let timeLeft = 60;
+const DURATION = 60;
+
+const topicText = document.getElementById('topicText');
+const sceneTake = document.getElementById('sceneTake');
+const recIndicator = document.getElementById('recIndicator');
+const stageBody = document.getElementById('stageBody');
+const takesCountEl = document.getElementById('takesCount');
+const bagCountEl = document.getElementById('bagCount');
+
+function buildSprockets(){
+  const rows = [document.getElementById('sprocketTop'), document.getElementById('sprocketBottom')];
+  const count = Math.max(8, Math.floor(window.innerWidth / 60));
+  rows.forEach(row=>{
+    row.innerHTML = '';
+    for(let i=0;i<count;i++){
+      const s = document.createElement('span');
+      row.appendChild(s);
+    }
+  });
+}
+buildSprockets();
+window.addEventListener('resize', buildSprockets);
+
+function refillBag(){
+  bag = [...TOPICS].sort(()=>Math.random()-0.5);
+}
+refillBag();
+
+function updateFooter(){
+  takesCountEl.textContent = `Takes done: ${takesDone}`;
+  bagCountEl.textContent = `Topics left in deck: ${bag.length}`;
+}
+
+let audioCtx = null;
+function ensureAudio(){
+  if(!audioCtx){
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if(!Ctx) return;
+    audioCtx = new Ctx();
+  }
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+}
+function playTick(landing){
+  if(!audioCtx) return;
+  try{
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.value = landing ? 520 : 950;
+    const now = audioCtx.currentTime;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(landing ? 0.22 : 0.13, now + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + (landing ? 0.12 : 0.045));
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + (landing ? 0.13 : 0.05));
+  }catch(e){}
+}
+
+function rollTopic(){
+  ensureAudio();
+  if(bag.length === 0) refillBag();
+  const nextTopic = bag.pop();
+  scene += 1;
+  take = 1;
+  updateFooter();
+  spinToTopic(nextTopic);
+}
+
+function spinToTopic(finalTopic){
+  const newBtn = document.getElementById('newTopicBtn');
+  const actionBtn = document.getElementById('actionBtn');
+  if(newBtn) newBtn.disabled = true;
+  if(actionBtn) actionBtn.disabled = true;
+  topicText.classList.add('spinning');
+
+  const totalTicks = 20;
+  let ticks = 0;
+
+  function step(){
+    if(ticks < totalTicks){
+      const randomDisplay = TOPICS[Math.floor(Math.random()*TOPICS.length)];
+      topicText.textContent = randomDisplay;
+      playTick(false);
+      ticks++;
+      const progress = ticks / totalTicks;
+      const delay = 40 + Math.pow(progress, 2) * 260;
+      setTimeout(step, delay);
+    } else {
+      currentTopic = finalTopic;
+      topicText.textContent = currentTopic;
+      topicText.classList.remove('spinning');
+      playTick(true);
+      sceneTake.textContent = `SCENE ${String(scene).padStart(3,'0')} · TAKE ${take}`;
+      renderIdle();
+    }
+  }
+  step();
+}
+
+function renderIdle(){
+  state = "idle";
+  recIndicator.classList.remove('live');
+  stopStreamIfAny();
+  stageBody.innerHTML = `
+    <div class="idle-copy">Go learn <b>${currentTopic ? currentTopic : "a topic"}</b> from a real source — no AI. Then hit <b>Action</b> and explain it out loud, unscripted, in 60 seconds flat.</div>
+    <label class="record-toggle"><input type="checkbox" id="recordToggle"> Also record this take (saves a video file)</label>
+    <div class="btn-row">
+      <button id="newTopicBtn">New Topic</button>
+      <button class="action" id="actionBtn" ${currentTopic ? '' : 'disabled'}>Action ▶</button>
+    </div>
+  `;
+  document.getElementById('newTopicBtn').addEventListener('click', rollTopic);
+  const actionBtn = document.getElementById('actionBtn');
+  if(actionBtn) actionBtn.addEventListener('click', startTake);
+}
+
+function renderRecordingShell(){
+  stageBody.innerHTML = `
+    <div class="cam-ring-wrap">
+      <div class="cam-placeholder" id="camPlaceholder">Camera preview<br>not available —<br>timer still runs.</div>
+      <video class="cam-video" id="camVideo" autoplay playsinline muted style="display:none;"></video>
+      <svg class="ring" width="210" height="210" viewBox="0 0 210 210">
+        <circle class="ring-bg" cx="105" cy="105" r="96"></circle>
+        <circle class="ring-fg" id="ringFg" cx="105" cy="105" r="96"
+          stroke-dasharray="603" stroke-dashoffset="0"></circle>
+      </svg>
+    </div>
+    <div style="text-align:center;">
+      <div class="countdown-num" id="countdownNum">60</div>
+      <div class="countdown-label">seconds left</div>
+    </div>
+    <div class="btn-row">
+      <button id="cutBtn">Cut</button>
+    </div>
+  `;
+  document.getElementById('cutBtn').addEventListener('click', ()=>endTake(true));
+}
+
+async function startTake(){
+  state = "recording";
+  recIndicator.classList.add('live');
+  timeLeft = DURATION;
+  renderRecordingShell();
+
+  const wantRecord = false; // placeholder, real flag set below
+  const recordToggleWasChecked = document.getElementById('recordToggle');
+  const shouldRecord = false;
+
+  await setupCamera();
+  startCountdown();
+}
+
+async function setupCamera(){
+  const video = document.getElementById('camVideo');
+  const placeholder = document.getElementById('camPlaceholder');
+  const wantsRecording = window.__wantsRecording === true;
+
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:"user" },
+      audio: wantsRecording
+    });
+    video.srcObject = stream;
+    video.style.display = 'block';
+    placeholder.style.display = 'none';
+
+    if(wantsRecording && window.MediaRecorder){
+      recordedChunks = [];
+      try{
+        recorder = new MediaRecorder(stream);
+        recorder.ondataavailable = (e)=>{ if(e.data.size>0) recordedChunks.push(e.data); };
+        recorder.start();
+      }catch(err){
+        recorder = null;
+      }
+    }
+  }catch(err){
+    stream = null;
+    video.style.display = 'none';
+    placeholder.style.display = 'flex';
+  }
+}
+
+function stopStreamIfAny(){
+  if(recorder && recorder.state !== 'inactive'){
+    try{ recorder.stop(); }catch(e){}
+  }
+  recorder = null;
+  if(stream){
+    stream.getTracks().forEach(t=>t.stop());
+    stream = null;
+  }
+  if(timerId){
+    clearInterval(timerId);
+    timerId = null;
+  }
+}
+
+const CIRC = 2 * Math.PI * 96;
+
+function startCountdown(){
+  const ring = document.getElementById('ringFg');
+  const numEl = document.getElementById('countdownNum');
+  ring.setAttribute('stroke-dasharray', CIRC.toFixed(1));
+  ring.setAttribute('stroke-dashoffset', '0');
+  numEl.textContent = timeLeft;
+
+  timerId = setInterval(()=>{
+    timeLeft -= 1;
+    if(numEl) numEl.textContent = Math.max(timeLeft,0);
+    const progress = 1 - (timeLeft / DURATION);
+    if(ring) ring.setAttribute('stroke-dashoffset', (CIRC*progress).toFixed(1));
+    if(timeLeft <= 0){
+      endTake(false);
+    }
+  }, 1000);
+}
+
+function endTake(cutEarly){
+  if(timerId){ clearInterval(timerId); timerId = null; }
+  takesDone += 1;
+  updateFooter();
+
+  let blobUrl = null;
+  if(recorder){
+    recorder.onstop = ()=>{
+      if(recordedChunks.length){
+        const blob = new Blob(recordedChunks, {type:'video/webm'});
+        blobUrl = URL.createObjectURL(blob);
+        renderDone(cutEarly, blobUrl);
+      }
+    };
+    try{ recorder.stop(); }catch(e){ renderDone(cutEarly, null); }
+  } else {
+    renderDone(cutEarly, null);
+  }
+
+  if(stream){
+    stream.getTracks().forEach(t=>t.stop());
+    stream = null;
+  }
+  recIndicator.classList.remove('live');
+}
+
+function renderDone(cutEarly, blobUrl){
+  state = "done";
+  const stampLabel = cutEarly ? "Cut" : "Wrapped";
+  stageBody.innerHTML = `
+    <div class="stamp">${stampLabel}</div>
+    <div class="done-note">Take ${take} on <b>${currentTopic}</b> is in the can. ${cutEarly ? "Ended early — that's fine, run it again or move on." : "Full sixty seconds, no notes."}</div>
+    ${blobUrl ? `<a class="dl-link" href="${blobUrl}" download="take-${scene}-${(currentTopic||'topic').toLowerCase().replace(/[^a-z0-9]+/g,'-')}.webm">Download this take</a>` : ''}
+    <div class="btn-row">
+      <button id="retakeBtn">Retake same topic</button>
+      <button class="primary" id="nextSceneBtn">Next Topic</button>
+    </div>
+  `;
+  document.getElementById('retakeBtn').addEventListener('click', ()=>{
+    take += 1;
+    sceneTake.textContent = `SCENE ${String(scene).padStart(3,'0')} · TAKE ${take}`;
+    renderIdle();
+  });
+  document.getElementById('nextSceneBtn').addEventListener('click', rollTopic);
+}
+
+// wire the record checkbox through a delegated listener since it's re-rendered
+document.addEventListener('change', (e)=>{
+  if(e.target && e.target.id === 'recordToggle'){
+    window.__wantsRecording = e.target.checked;
+  }
+});
+
+renderIdle();
+updateFooter();
+</script>
+</body>
+</html>
