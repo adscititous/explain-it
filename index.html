@@ -125,6 +125,11 @@
     font-size:clamp(26px,6.4vw,36px);
     line-height:1.18;
     letter-spacing:-.01em;
+    transition:opacity .05s ease;
+  }
+  .topic.spinning{
+    color:var(--muted);
+    opacity:.75;
   }
 
   .stage-body{
@@ -385,15 +390,71 @@ function updateFooter(){
   bagCountEl.textContent = `Topics left in deck: ${bag.length}`;
 }
 
+let audioCtx = null;
+function ensureAudio(){
+  if(!audioCtx){
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if(!Ctx) return;
+    audioCtx = new Ctx();
+  }
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+}
+function playTick(landing){
+  if(!audioCtx) return;
+  try{
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.value = landing ? 520 : 950;
+    const now = audioCtx.currentTime;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(landing ? 0.22 : 0.13, now + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + (landing ? 0.12 : 0.045));
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + (landing ? 0.13 : 0.05));
+  }catch(e){}
+}
+
 function rollTopic(){
+  ensureAudio();
   if(bag.length === 0) refillBag();
-  currentTopic = bag.pop();
+  const nextTopic = bag.pop();
   scene += 1;
   take = 1;
-  topicText.textContent = currentTopic;
-  sceneTake.textContent = `SCENE ${String(scene).padStart(3,'0')} · TAKE ${take}`;
   updateFooter();
-  renderIdle();
+  spinToTopic(nextTopic);
+}
+
+function spinToTopic(finalTopic){
+  const newBtn = document.getElementById('newTopicBtn');
+  const actionBtn = document.getElementById('actionBtn');
+  if(newBtn) newBtn.disabled = true;
+  if(actionBtn) actionBtn.disabled = true;
+  topicText.classList.add('spinning');
+
+  const totalTicks = 20;
+  let ticks = 0;
+
+  function step(){
+    if(ticks < totalTicks){
+      const randomDisplay = TOPICS[Math.floor(Math.random()*TOPICS.length)];
+      topicText.textContent = randomDisplay;
+      playTick(false);
+      ticks++;
+      const progress = ticks / totalTicks;
+      const delay = 40 + Math.pow(progress, 2) * 260;
+      setTimeout(step, delay);
+    } else {
+      currentTopic = finalTopic;
+      topicText.textContent = currentTopic;
+      topicText.classList.remove('spinning');
+      playTick(true);
+      sceneTake.textContent = `SCENE ${String(scene).padStart(3,'0')} · TAKE ${take}`;
+      renderIdle();
+    }
+  }
+  step();
 }
 
 function renderIdle(){
