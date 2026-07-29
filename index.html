@@ -184,46 +184,13 @@
   }
   button:disabled{opacity:.4;cursor:not-allowed;transform:none;}
 
-  label.record-toggle{
-    display:flex;
-    align-items:center;
-    gap:7px;
-    font-family:'IBM Plex Mono',monospace;
-    font-size:11px;
-    color:var(--muted);
-    letter-spacing:.04em;
-    cursor:pointer;
-  }
-  label.record-toggle input{accent-color:var(--red);}
-
   /* recording state */
-  .cam-ring-wrap{
+  .ring-wrap{
     position:relative;
     width:210px;height:210px;
-  }
-  .cam-video{
-    position:absolute;
-    top:8px;left:8px;
-    width:194px;height:194px;
-    border-radius:50%;
-    object-fit:cover;
-    background:#0f0d0a;
-    transform:scaleX(-1);
-  }
-  .cam-placeholder{
-    position:absolute;
-    top:8px;left:8px;
-    width:194px;height:194px;
-    border-radius:50%;
-    background:#e1d6b8;
     display:flex;
     align-items:center;
     justify-content:center;
-    color:var(--muted);
-    font-size:11px;
-    text-align:center;
-    padding:20px;
-    font-family:'IBM Plex Mono',monospace;
   }
   svg.ring{position:absolute;top:0;left:0;transform:rotate(-90deg);}
   .ring-bg{fill:none;stroke:#d9cba3;stroke-width:6;}
@@ -263,13 +230,6 @@
     font-size:13px;
     max-width:300px;
   }
-  a.dl-link{
-    font-family:'IBM Plex Mono',monospace;
-    font-size:12px;
-    color:var(--ink);
-    text-decoration:underline;
-  }
-
   .footer{
     margin-top:20px;
     display:flex;
@@ -352,9 +312,6 @@ let take = 1;
 let takesDone = 0;
 
 let state = "idle"; // idle | recording | done
-let stream = null;
-let recorder = null;
-let recordedChunks = [];
 let timerId = null;
 let timeLeft = 60;
 const DURATION = 60;
@@ -460,10 +417,9 @@ function spinToTopic(finalTopic){
 function renderIdle(){
   state = "idle";
   recIndicator.classList.remove('live');
-  stopStreamIfAny();
+  if(timerId){ clearInterval(timerId); timerId = null; }
   stageBody.innerHTML = `
     <div class="idle-copy">Go learn <b>${currentTopic ? currentTopic : "a topic"}</b> from a real source — no AI. Then hit <b>Action</b> and explain it out loud, unscripted, in 60 seconds flat.</div>
-    <label class="record-toggle"><input type="checkbox" id="recordToggle"> Also record this take (saves a video file)</label>
     <div class="btn-row">
       <button id="newTopicBtn">New Topic</button>
       <button class="action" id="actionBtn" ${currentTopic ? '' : 'disabled'}>Action ▶</button>
@@ -476,18 +432,16 @@ function renderIdle(){
 
 function renderRecordingShell(){
   stageBody.innerHTML = `
-    <div class="cam-ring-wrap">
-      <div class="cam-placeholder" id="camPlaceholder">Camera preview<br>not available —<br>timer still runs.</div>
-      <video class="cam-video" id="camVideo" autoplay playsinline muted style="display:none;"></video>
+    <div class="ring-wrap">
       <svg class="ring" width="210" height="210" viewBox="0 0 210 210">
         <circle class="ring-bg" cx="105" cy="105" r="96"></circle>
         <circle class="ring-fg" id="ringFg" cx="105" cy="105" r="96"
           stroke-dasharray="603" stroke-dashoffset="0"></circle>
       </svg>
-    </div>
-    <div style="text-align:center;">
-      <div class="countdown-num" id="countdownNum">60</div>
-      <div class="countdown-label">seconds left</div>
+      <div style="text-align:center;">
+        <div class="countdown-num" id="countdownNum">60</div>
+        <div class="countdown-label">seconds left</div>
+      </div>
     </div>
     <div class="btn-row">
       <button id="cutBtn">Cut</button>
@@ -496,64 +450,12 @@ function renderRecordingShell(){
   document.getElementById('cutBtn').addEventListener('click', ()=>endTake(true));
 }
 
-async function startTake(){
+function startTake(){
   state = "recording";
   recIndicator.classList.add('live');
   timeLeft = DURATION;
   renderRecordingShell();
-
-  const wantRecord = false; // placeholder, real flag set below
-  const recordToggleWasChecked = document.getElementById('recordToggle');
-  const shouldRecord = false;
-
-  await setupCamera();
   startCountdown();
-}
-
-async function setupCamera(){
-  const video = document.getElementById('camVideo');
-  const placeholder = document.getElementById('camPlaceholder');
-  const wantsRecording = window.__wantsRecording === true;
-
-  try{
-    stream = await navigator.mediaDevices.getUserMedia({
-      video:{ facingMode:"user" },
-      audio: wantsRecording
-    });
-    video.srcObject = stream;
-    video.style.display = 'block';
-    placeholder.style.display = 'none';
-
-    if(wantsRecording && window.MediaRecorder){
-      recordedChunks = [];
-      try{
-        recorder = new MediaRecorder(stream);
-        recorder.ondataavailable = (e)=>{ if(e.data.size>0) recordedChunks.push(e.data); };
-        recorder.start();
-      }catch(err){
-        recorder = null;
-      }
-    }
-  }catch(err){
-    stream = null;
-    video.style.display = 'none';
-    placeholder.style.display = 'flex';
-  }
-}
-
-function stopStreamIfAny(){
-  if(recorder && recorder.state !== 'inactive'){
-    try{ recorder.stop(); }catch(e){}
-  }
-  recorder = null;
-  if(stream){
-    stream.getTracks().forEach(t=>t.stop());
-    stream = null;
-  }
-  if(timerId){
-    clearInterval(timerId);
-    timerId = null;
-  }
 }
 
 const CIRC = 2 * Math.PI * 96;
@@ -580,35 +482,16 @@ function endTake(cutEarly){
   if(timerId){ clearInterval(timerId); timerId = null; }
   takesDone += 1;
   updateFooter();
-
-  let blobUrl = null;
-  if(recorder){
-    recorder.onstop = ()=>{
-      if(recordedChunks.length){
-        const blob = new Blob(recordedChunks, {type:'video/webm'});
-        blobUrl = URL.createObjectURL(blob);
-        renderDone(cutEarly, blobUrl);
-      }
-    };
-    try{ recorder.stop(); }catch(e){ renderDone(cutEarly, null); }
-  } else {
-    renderDone(cutEarly, null);
-  }
-
-  if(stream){
-    stream.getTracks().forEach(t=>t.stop());
-    stream = null;
-  }
   recIndicator.classList.remove('live');
+  renderDone(cutEarly);
 }
 
-function renderDone(cutEarly, blobUrl){
+function renderDone(cutEarly){
   state = "done";
   const stampLabel = cutEarly ? "Cut" : "Wrapped";
   stageBody.innerHTML = `
     <div class="stamp">${stampLabel}</div>
     <div class="done-note">Take ${take} on <b>${currentTopic}</b> is in the can. ${cutEarly ? "Ended early — that's fine, run it again or move on." : "Full sixty seconds, no notes."}</div>
-    ${blobUrl ? `<a class="dl-link" href="${blobUrl}" download="take-${scene}-${(currentTopic||'topic').toLowerCase().replace(/[^a-z0-9]+/g,'-')}.webm">Download this take</a>` : ''}
     <div class="btn-row">
       <button id="retakeBtn">Retake same topic</button>
       <button class="primary" id="nextSceneBtn">Next Topic</button>
@@ -621,13 +504,6 @@ function renderDone(cutEarly, blobUrl){
   });
   document.getElementById('nextSceneBtn').addEventListener('click', rollTopic);
 }
-
-// wire the record checkbox through a delegated listener since it's re-rendered
-document.addEventListener('change', (e)=>{
-  if(e.target && e.target.id === 'recordToggle'){
-    window.__wantsRecording = e.target.checked;
-  }
-});
 
 renderIdle();
 updateFooter();
